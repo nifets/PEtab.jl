@@ -333,3 +333,5 @@ function _map_matrix!(x_subset, x_full, imap)
     end
     return
 end
+
+Base.copy(prob::PEtabODEProblem) = deepcopy(prob)

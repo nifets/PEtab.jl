@@ -63,6 +63,10 @@ if !core_only
         include("remake.jl")
     end
 
+    @safetestset "PEtab copy" begin
+        include("copy.jl")
+    end
+
     @safetestset "Log-likelihood values and gradients for published models" begin
         include("published_models.jl")
     end
