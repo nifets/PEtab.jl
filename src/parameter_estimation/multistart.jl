@@ -171,13 +171,12 @@ end
 
 function _load_packages_workers(workers::Vector{Int64}, alg)::Nothing
     isempty(workers) && return nothing
-    loaded = Set(Symbol(k.name) for k in keys(Base.loaded_modules))
     @eval Distributed.@everywhere $workers Base.eval(Main, :(using PEtab))
-    alg_package = nameof(Base.moduleroot(parentmodule(typeof(alg))))
-    packages = unique(vcat(filter(in(loaded), _SUPPORTED_PACKAGES), alg_package))
-    for pkg in filter(!in((:Main, :Base, :Core, :PEtab)), packages)
-        ex = :(using $(pkg))
-        @eval Distributed.@everywhere $workers Base.eval(Main, $ex)
+    packages = vcat(_SUPPORTED_PACKAGES, nameof(Base.moduleroot(parentmodule(typeof(alg)))))
+    for pkgid in keys(Base.loaded_modules)
+        isnothing(pkgid.uuid) && continue
+        Symbol(pkgid.name) in packages || continue
+        @eval Distributed.@everywhere $workers Base.require($pkgid)
     end
     return nothing
 end
