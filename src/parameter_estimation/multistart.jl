@@ -1,4 +1,4 @@
-const _SUPPORTED_PACKAGES = [:Fides, :Ipopt, :Optim, :Optimisers]
+const _SUPPORTED_PACKAGES = [:Fides, :Ipopt, :Optim, :Optimisers, :Optimization]
 
 """
     calibrate_multistart([rng::AbstractRng], prob::PEtabODEProblem, alg, nmultistarts::Integer;
@@ -95,7 +95,7 @@ function _calibrate_multistart(
     # on each relevant process
     _nprocs = nprocs == 1 ? nprocs - 1 : nprocs
     pids = _create_workers(_nprocs)
-    _load_packages_workers(pids)
+    _load_packages_workers(pids, alg)
     _xstarts = [(x.second, x.first) for x in pairs(xstarts)]
     _calibrate_procs = x -> _calibrate_startguess(
         x[1], x[2], prob, alg, save_trace,
@@ -169,11 +169,13 @@ function _save_multistart_results(
     return nothing
 end
 
-function _load_packages_workers(workers::Vector{Int64})::Nothing
+function _load_packages_workers(workers::Vector{Int64}, alg)::Nothing
     isempty(workers) && return nothing
     loaded = Set(Symbol(k.name) for k in keys(Base.loaded_modules))
     @eval Distributed.@everywhere $workers Base.eval(Main, :(using PEtab))
-    for pkg in filter(in(loaded), _SUPPORTED_PACKAGES)
+    alg_package = nameof(Base.moduleroot(parentmodule(typeof(alg))))
+    packages = unique(vcat(filter(in(loaded), _SUPPORTED_PACKAGES), alg_package))
+    for pkg in filter(!in((:Main, :Base, :Core, :PEtab)), packages)
         ex = :(using $(pkg))
         @eval Distributed.@everywhere $workers Base.eval(Main, $ex)
     end

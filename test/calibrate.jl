@@ -21,6 +21,9 @@ using PEtab, Distributions, CSV, DataFrames, OrdinaryDiffEqRosenbrock, Catalyst,
 
     res_ms = calibrate_multistart(prob, LBFGSB(), 5)
     @test all(.≈(res_ms.xmin, prob.xnominal_transformed, atol = 1.0e-2))
+
+    res_par = calibrate_multistart(prob, LBFGSB(), 4; nprocs = 2)
+    @test all(.≈(res_par.xmin, prob.xnominal_transformed, atol = 1.0e-2))
 end
 
 @testset "Calibrate single start Fides" begin
