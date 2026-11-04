@@ -4,7 +4,24 @@
 =#
 
 using PEtab, Distributions, CSV, DataFrames, OrdinaryDiffEqRosenbrock, Catalyst,
-    ComponentArrays, Optim, Ipopt, Fides, Optimization, OptimizationOptimJL, Test
+    ComponentArrays, Optim, Ipopt, Fides, Optimization, OptimizationOptimJL,
+    OptimizationLBFGSB, Test
+
+@testset "Calibrate Optimization.jl algorithm" begin
+    path_yaml = joinpath(@__DIR__, "analytic_solution", "Test_model2.yaml")
+    prob = PEtabModel(path_yaml) |>
+        PEtabODEProblem
+    x0 = get_x(prob) .* 0.5
+    res = calibrate(prob, x0, LBFGSB(); save_trace = true, options = (maxiters = 1000,))
+    @test res isa PEtabOptimisationResult
+    @test res.alg == :LBFGSB
+    @test !isempty(res.ftrace)
+    @test res.fmin ≈ prob.nllh(res.xmin)
+    @test all(.≈(res.xmin, prob.xnominal_transformed, atol = 1.0e-2))
+
+    res_ms = calibrate_multistart(prob, LBFGSB(), 5)
+    @test all(.≈(res_ms.xmin, prob.xnominal_transformed, atol = 1.0e-2))
+end
 
 @testset "Calibrate single start Fides" begin
     path_yaml = joinpath(@__DIR__, "analytic_solution", "Test_model2.yaml")

@@ -1,8 +1,11 @@
 module PEtabOptimizationExtension
 
 import Catalyst: @unpack
+import ComponentArrays: ComponentVector
 import Optimization: OptimizationFunction, OptimizationProblem
 import PEtab
+import QuasiMonteCarlo: LatinHypercubeSample
+import Random
 import SciMLBase
 
 function SciMLBase.OptimizationProblem(
@@ -22,6 +25,45 @@ function SciMLBase.OptimizationProblem(
     end
     return OptimizationProblem(
         optf, x0, SciMLBase.NullParameters(); lb = lower_bounds, ub = upper_bounds
+    )
+end
+
+function PEtab.calibrate_multistart(
+        rng::Random.AbstractRNG, prob::PEtab.PEtabODEProblem, alg, nmultistarts;
+        nprocs = 1, save_trace = false, dirsave = nothing, sample_prior = true,
+        sampling_method = LatinHypercubeSample(), show_progress = false,
+        init_weight = nothing, init_bias = nothing, options = NamedTuple()
+    )::PEtab.PEtabMultistartResult
+    return PEtab._calibrate_multistart(
+        rng, prob, alg, nmultistarts, dirsave, sampling_method, options, sample_prior,
+        save_trace, nprocs, show_progress, init_weight, init_bias
+    )
+end
+
+function PEtab.calibrate(
+        prob::PEtab.PEtabODEProblem, x::Union{Vector{<:AbstractFloat}, ComponentVector},
+        alg; save_trace::Bool = false, options = NamedTuple()
+    )::PEtab.PEtabOptimisationResult
+    x0 = PEtab._get_x_out(x, prob)
+    optprob = SciMLBase.remake(OptimizationProblem(prob); u0 = deepcopy(x0))
+
+    ftrace = Vector{Float64}(undef, 0)
+    xtrace = Vector{Vector{Float64}}(undef, 0)
+    callback = function (state, loss)
+        if save_trace
+            push!(ftrace, loss)
+            push!(xtrace, collect(state.u))
+        end
+        return false
+    end
+
+    runtime = @elapsed sol = SciMLBase.solve(optprob, alg; callback, options...)
+
+    xmin = PEtab._get_x_out(sol.u, prob)
+    fmin = isfinite(sol.objective) ? sol.objective : NaN
+    return PEtab.PEtabOptimisationResult(
+        xmin, fmin, x0, nameof(typeof(alg)), sol.stats.iterations, runtime, xtrace,
+        ftrace, sol.retcode, sol
     )
 end
 
