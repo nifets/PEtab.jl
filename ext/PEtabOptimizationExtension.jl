@@ -41,7 +41,7 @@ function PEtab.calibrate_multistart(
 end
 
 function PEtab.calibrate(
-        prob::PEtab.PEtabODEProblem, x::Union{Vector{<:AbstractFloat}, ComponentVector},
+        prob::PEtab.PEtabODEProblem, x::AbstractVector{<:Real},
         alg; save_trace::Bool = false, options = NamedTuple()
     )::PEtab.PEtabOptimisationResult
     x0 = PEtab._get_x_out(x, prob)
